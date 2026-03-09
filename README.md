@@ -4,6 +4,13 @@
 
 An interactive prototype demonstrating a QR code–initiated chatbot survey for the ATN 164 Screen2Prevent (S2P) study. This prototype shows how adolescents and young adults (ages 14–24) would complete an HIV screening and prevention survey on their personal mobile device in a pediatric ED setting.
 
+## The Goal of using a personal device solves many issues including:
+
+Device allocation. The device does not need to be purchased and managed by the hospital.
+Device management. Patches and device security are not the responsibilty of the hospital. Theft or damage are not issues. The device belongs to the patient.
+Comfort level. The device owned by the patient is known to them and they control it.
+Contamination. The devices not need to be wiped down before beinging handled by another patient. This is their device and they own it.
+
 ---
 
 ## What's in This Repo
