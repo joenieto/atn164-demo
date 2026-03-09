@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<title>Health & Wellness Survey — Texas Children's Hospital</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='16' fill='%23CC0033'/><text x='16' y='22' text-anchor='middle' fill='white' font-size='16' font-weight='bold' font-family='sans-serif'>TC</text></svg>"/>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body,#root{height:100%;width:100%;overflow:hidden}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',sans-serif;background:#fff;-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;-webkit-tap-highlight-color:transparent;outline:none}
+  ::-webkit-scrollbar{display:none}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes dotPulse{0%,80%,100%{opacity:.3;transform:scale(.8)}40%{opacity:1;transform:scale(1.1)}}
+  @keyframes slideIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes checkPop{0%{transform:scale(0)}50%{transform:scale(1.2)}100%{transform:scale(1)}}
+  @keyframes scanLine{0%{top:10%}50%{top:85%}100%{top:10%}}
+  @keyframes cornerPulse{0%,100%{opacity:.6}50%{opacity:1}}
+  @keyframes popIn{0%{opacity:0;transform:translateY(30px) scale(.95)}100%{opacity:1;transform:translateY(0) scale(1)}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script>
+"use strict";
+const e=React.createElement,{useState,useEffect,useRef,useCallback}=React;
+
+/* ═══ SURVEY SCRIPT ═══ */
+const SCRIPT=[
+  {id:"age",messages:["Hey there! \ud83d\udc4b","I\u2019m going to ask you a few quick questions about your health. Everything you share is completely private \u2014 no one in the waiting room or your family will see your answers.","Let\u2019s start with something easy.\n\nHow old are you?"],options:["14\u201315","16\u201317","18\u201320","21\u201324"],next:"gender"},
+  {id:"gender",messages:["Got it, thanks!","How do you describe your gender?"],options:["Male","Female","Transgender","Non-binary","Other","Prefer not to say"],next:"pcp"},
+  {id:"pcp",messages:["Thanks for sharing that.","Do you have a primary care doctor or clinic you see regularly?"],options:["Yes","No","Not sure"],next:"hiv_test",responses:{"No":"That\u2019s actually more common than you might think, especially for people your age. That\u2019s one reason we offer health screenings here in the ED.","Not sure":"No worries \u2014 that\u2019s okay. We just want to make sure you have access to the care you need."}},
+  {id:"hiv_test",messages:["Have you ever been tested for HIV?"],options:["Yes","No","Not sure","Prefer not to say"],next:"sexual_activity",responses:{"No":"That\u2019s completely fine. HIV testing is a routine part of healthcare, and we recommend it for everyone.","Not sure":"No problem. It may have been part of a blood test you had before."}},
+  {id:"sexual_activity",privacyReminder:true,messages:["In the past 12 months, have you been sexually active?"],options:["Yes","No","Prefer not to say"],nextFn:true,responses:{"No":"Thanks for letting me know. I\u2019ll skip ahead to the next section."}},
+  {id:"partners",messages:["Thanks for being open with me.","In the past 12 months, what best describes your sexual partners?"],options:["Male partners","Female partners","Both male and female","Prefer not to say"],next:"condom"},
+  {id:"condom",messages:["How often do you use condoms or other barrier protection?"],options:["Always","Sometimes","Rarely","Never","Prefer not to say"],next:"sti"},
+  {id:"sti",messages:["Have you ever been diagnosed with a sexually transmitted infection (STI)?"],options:["Yes","No","Not sure","Prefer not to say"],next:"substances"},
+  {id:"substances",messages:["Just a couple more questions \u2014 you\u2019re doing great.","In the past 12 months, have you used any recreational drugs or substances?"],options:["Yes","No","Prefer not to say"],next:"screening_offer"},
+  {id:"screening_offer",messages:["Thanks for answering all of that honestly. It really helps us take better care of you.","Based on your responses, we\u2019d like to offer you a free, confidential HIV screening test today as part of your ED visit.\n\nWould you like to be tested?"],options:["Yes, test me","No thanks","I need more info"],next:"complete",responses:{"Yes, test me":"Great choice. Your care team will follow up with you about the test.","No thanks":"That\u2019s completely okay. Your decision is respected, and it won\u2019t affect your care today.","I need more info":"No problem. Your care team can answer any questions you have about HIV testing. It\u2019s a simple, quick test."}},
+  {id:"complete",messages:[],isComplete:true}
+];
+
+function getNextId(step,answer){
+  if(step.nextFn)return answer==="Yes"?"partners":"substances";
+  return step.next;
+}
+function findIdx(id){return SCRIPT.findIndex(s=>s.id===id)}
+function delay(ms){return new Promise(r=>setTimeout(r,ms))}
+
+const TC_RED="#CC0033",TC_BLUE="#0066B3",CHAT_BG="#f0f2f5",SUCCESS="#2D8B4E";
+
+const avatarS={width:32,height:32,borderRadius:"50%",background:TC_RED,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:800,color:"#fff",flexShrink:0,letterSpacing:.5};
+
+/* ═══ COMPONENTS ═══ */
+function TypingDots(){
+  return e("div",{style:{display:"flex",alignItems:"center",gap:8,padding:"8px 0"}},
+    e("div",{style:avatarS},"TC"),
+    e("div",{style:{background:"#fff",borderRadius:"18px 18px 18px 4px",padding:"12px 18px",display:"flex",gap:5,alignItems:"center",boxShadow:"0 1px 2px rgba(0,0,0,.05)"}},
+      ...[0,1,2].map(i=>e("div",{key:i,style:{width:7,height:7,borderRadius:"50%",background:"#94a3b8",animation:`dotPulse 1.2s ease-in-out ${i*.15}s infinite`}}))
+    )
+  );
+}
+
+function BotBubble({text,isPrivacy}){
+  if(isPrivacy){
+    return e("div",{style:{display:"flex",gap:8,alignItems:"flex-end"}},
+      e("div",{style:avatarS},"TC"),
+      e("div",{style:{background:"#fff",borderRadius:"18px 18px 18px 4px",padding:4,maxWidth:"82%",boxShadow:"0 1px 2px rgba(0,0,0,.05)"}},
+        e("div",{style:{background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:14,padding:"10px 14px",margin:"6px 8px 2px"}},
+          e("div",{style:{fontSize:12,color:TC_BLUE,lineHeight:1.5}},
+            "\ud83d\udd12 ",e("strong",null,"Reminder:")," Your answers are private and will not be shared with anyone in the waiting room or your family."
+          )
+        ),
+        e("div",{style:{padding:"8px 14px 12px",fontSize:15,lineHeight:1.5,color:"#1a1a2e",whiteSpace:"pre-wrap"}},text)
+      )
+    );
+  }
+  return e("div",{style:{display:"flex",gap:8,alignItems:"flex-end"}},
+    e("div",{style:avatarS},"TC"),
+    e("div",{style:{background:"#fff",borderRadius:"18px 18px 18px 4px",padding:"12px 16px",maxWidth:"82%",fontSize:15,lineHeight:1.5,color:"#1a1a2e",boxShadow:"0 1px 2px rgba(0,0,0,.05)",whiteSpace:"pre-wrap"}},text)
+  );
+}
+
+function UserBubble({text}){
+  return e("div",{style:{display:"flex",justifyContent:"flex-end"}},
+    e("div",{style:{background:TC_BLUE,borderRadius:"18px 18px 4px 18px",padding:"11px 16px",maxWidth:"75%",fontSize:15,lineHeight:1.4,color:"#fff"}},text)
+  );
+}
+
+function OptionBtn({text,onClick}){
+  const[p,setP]=useState(false);
+  return e("button",{
+    onClick:()=>{setP(true);onClick(text)},
+    onTouchStart:()=>setP(true),onTouchEnd:()=>setP(false),
+    onMouseDown:()=>setP(true),onMouseUp:()=>setP(false),onMouseLeave:()=>setP(false),
+    style:{padding:"10px 20px",borderRadius:24,border:`1.5px solid ${p?TC_BLUE:"#d0d5dd"}`,background:p?"#e8f4fd":"#fff",fontSize:14,fontWeight:500,color:p?TC_BLUE:"#344054",cursor:"pointer",transition:"all .15s ease",whiteSpace:"nowrap"}
+  },text);
+}
+
+function Shell({children,showBar}){
+  return e("div",{style:{height:"100%",display:"flex",flexDirection:"column",background:"#fff",maxWidth:480,margin:"0 auto",position:"relative",overflow:"hidden"}},
+    showBar?e("div",{style:{padding:"8px 16px",background:"#f3f4f6",display:"flex",alignItems:"center",gap:6,borderBottom:"1px solid #e5e7eb",flexShrink:0}},
+      e("div",{style:{width:14,height:14,borderRadius:"50%",background:SUCCESS,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,color:"#fff",fontWeight:700}},"\u2713"),
+      e("span",{style:{fontSize:12,color:"#344054"}},"s2p.texaschildrens.org/survey")
+    ):null,
+    children
+  );
+}
+
+function ConsentCB({onAgree}){
+  const[c,setC]=useState(false);
+  return e("div",null,
+    e("button",{onClick:()=>setC(!c),style:{display:"flex",alignItems:"flex-start",gap:12,background:"#f9fafb",borderRadius:12,padding:14,marginBottom:18,border:"none",cursor:"pointer",width:"100%",textAlign:"left"}},
+      e("div",{style:{width:22,height:22,borderRadius:5,flexShrink:0,marginTop:1,border:c?"none":"2px solid #d0d5dd",background:c?TC_BLUE:"#fff",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .15s ease",animation:c?"checkPop .25s ease":"none"}},
+        c?e("span",{style:{color:"#fff",fontSize:13,fontWeight:700}},"\u2713"):null
+      ),
+      e("span",{style:{fontSize:13,color:"#344054",lineHeight:1.5}},"I have read and understand this information, and I agree to participate in this survey.")
+    ),
+    e("button",{onClick:c?onAgree:void 0,style:{width:"100%",maxWidth:320,padding:"15px 0",borderRadius:26,border:"none",background:`linear-gradient(135deg,${TC_BLUE},#004d86)`,color:"#fff",fontSize:16,fontWeight:700,cursor:c?"pointer":"default",boxShadow:"0 4px 14px rgba(0,102,179,.3)",opacity:c?1:.45,transition:"opacity .2s ease"}},
+      "I Agree \u2014 Start Survey"
+    )
+  );
+}
+
+/* ═══ QR PROMPT ═══ */
+function QRPrompt({onOpen}){
+  const[show,setShow]=useState(false);
+  useEffect(function(){var t=setTimeout(function(){setShow(true)},1800);return function(){clearTimeout(t)}},[]);
+  if(!show)return null;
+  return e("div",{style:{position:"absolute",bottom:40,left:20,right:20,zIndex:10,animation:"popIn .4s ease"}},
+    e("div",{style:{background:"#fff",borderRadius:16,padding:"16px 20px",boxShadow:"0 8px 32px rgba(0,0,0,.3)"}},
+      e("div",{style:{fontSize:14,fontWeight:600,color:"#1a1a2e",marginBottom:2}},"Open in Browser?"),
+      e("div",{style:{fontSize:12,color:"#64748b",marginBottom:14}},"s2p.texaschildrens.org/survey"),
+      e("div",{style:{display:"flex",gap:10,justifyContent:"flex-end"}},
+        e("button",{onClick:function(){},style:{padding:"8px 24px",borderRadius:20,background:"#e5e7eb",border:"none",fontSize:13,fontWeight:600,color:"#475569",cursor:"pointer"}},"Cancel"),
+        e("button",{onClick:onOpen,style:{padding:"8px 24px",borderRadius:20,background:"#0066B3",border:"none",fontSize:13,fontWeight:600,color:"#fff",cursor:"pointer"}},"Open")
+      )
+    )
+  );
+}
+
+/* ═══ MAIN APP ═══ */
+function App(){
+  const[screen,setScreen]=useState("qrscan");
+  const[chatLog,setChatLog]=useState([]);
+  const[typing,setTyping]=useState(false);
+  const[step,setStep]=useState(0);
+  const[awaiting,setAwaiting]=useState(false);
+  const[opts,setOpts]=useState([]);
+  const[progress,setProg]=useState(0);
+  const[answers,setAnswers]=useState({});
+  const scrollRef=useRef(null);
+  const proc=useRef(false);
+
+  const scrollB=useCallback(()=>{setTimeout(()=>{if(scrollRef.current)scrollRef.current.scrollTop=scrollRef.current.scrollHeight},50)},[]);
+
+  const deliver=useCallback(async(idx,resp)=>{
+    if(proc.current)return;proc.current=true;
+    const s=SCRIPT[idx];
+    if(!s){proc.current=false;return}
+
+    if(s.isComplete){
+      const eligible=answers["sexual_activity"]==="Yes"||answers["hiv_test"]==="No";
+      setProg(100);
+      const msgs=["That\u2019s all the questions! You did great. \ud83c\udf89","Here\u2019s what happens next:\n\n\u2705 Your responses have been securely sent to your care team\n\u2705 A clinician may follow up with you\n\u2705 No data has been saved on your phone","Thank you for participating. Your honesty helps us provide better care for young people like you. \ud83d\ude4f"];
+      for(const m of msgs){setTyping(true);scrollB();await delay(800+Math.random()*600);setTyping(false);setChatLog(p=>[...p,{type:"bot",text:m}]);scrollB()}
+      await delay(1200);
+      setScreen(eligible?"mhealth":"done");
+      proc.current=false;return;
+    }
+
+    if(resp){setTyping(true);scrollB();await delay(500+Math.random()*400);setTyping(false);setChatLog(p=>[...p,{type:"bot",text:resp}]);scrollB()}
+
+    for(let i=0;i<s.messages.length;i++){
+      setTyping(true);scrollB();
+      await delay((s.messages[i].length>80?1200:700)+Math.random()*500);
+      setTyping(false);
+      const isLast=i===s.messages.length-1;
+      setChatLog(p=>[...p,{type:"bot",text:s.messages[i],isPrivacy:isLast&&s.privacyReminder}]);
+      scrollB();
+    }
+
+    setProg(Math.round(idx/(SCRIPT.length-1)*100));
+    setOpts(s.options||[]);setAwaiting(true);scrollB();
+    proc.current=false;
+  },[answers,scrollB]);
+
+  const handleAns=useCallback((ans)=>{
+    if(proc.current)return;
+    const s=SCRIPT[step];
+    setAwaiting(false);setOpts([]);
+    setChatLog(p=>[...p,{type:"user",text:ans}]);scrollB();
+    setAnswers(p=>({...p,[s.id]:ans}));
+    const nxt=getNextId(s,ans);
+    const ni=findIdx(nxt);
+    const resp=s.responses?.[ans]||null;
+    setStep(ni);
+    setTimeout(()=>deliver(ni,resp),400);
+  },[step,deliver,scrollB]);
+
+  const startChat=useCallback(()=>{setScreen("chat");setTimeout(()=>deliver(0),600)},[deliver]);
+
+  /* ─── QR SCAN ─── */
+  if(screen==="qrscan"){
+    return e("div",{style:{height:"100%",display:"flex",flexDirection:"column",background:"#111",maxWidth:480,margin:"0 auto",position:"relative",overflow:"hidden"}},
+      // Status bar
+      e("div",{style:{padding:"10px 20px 6px",display:"flex",justifyContent:"space-between",alignItems:"center",color:"#fff",fontSize:12,fontWeight:600,flexShrink:0}},
+        e("span",null,"10:42"),
+        e("span",{style:{fontSize:11,opacity:.7}},"\u25cf\u25cf\u25cf\u25cf \ud83d\udd0b")
+      ),
+      // Camera label
+      e("div",{style:{padding:"4px 0 8px",textAlign:"center",flexShrink:0}},
+        e("span",{style:{fontSize:11,color:"#94a3b8",textTransform:"uppercase",letterSpacing:2,fontWeight:600}},"Camera")
+      ),
+      // Viewfinder area
+      e("div",{style:{flex:1,display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}},
+        // Dark overlay
+        e("div",{style:{position:"absolute",inset:0,background:"radial-gradient(circle at center,transparent 25%,rgba(0,0,0,.65) 60%)"}}),
+        // Scanner frame
+        e("div",{style:{width:220,height:220,position:"relative",zIndex:2}},
+          // Corner brackets
+          ...[[0,0],[1,0],[0,1],[1,1]].map(function(c,i){
+            return e("div",{key:i,style:{position:"absolute",width:36,height:36,
+              top:c[1]===0?-2:"auto",bottom:c[1]===1?-2:"auto",
+              left:c[0]===0?-2:"auto",right:c[0]===1?-2:"auto",
+              borderColor:"#0066B3",borderStyle:"solid",borderWidth:0,
+              borderTopWidth:c[1]===0?3:0,borderBottomWidth:c[1]===1?3:0,
+              borderLeftWidth:c[0]===0?3:0,borderRightWidth:c[0]===1?3:0,
+              borderRadius:c[1]===0&&c[0]===0?"8px 0 0 0":c[1]===0&&c[0]===1?"0 8px 0 0":c[1]===1&&c[0]===0?"0 0 0 8px":"0 0 8px 0",
+              animation:"cornerPulse 2s ease-in-out infinite"}})
+          }),
+          // Scan line
+          e("div",{style:{position:"absolute",left:8,right:8,height:2,background:"linear-gradient(90deg,transparent,#0066B3,transparent)",animation:"scanLine 2.5s ease-in-out infinite",zIndex:3,borderRadius:1}}),
+          // QR pattern
+          e("div",{style:{position:"absolute",top:32,left:32,right:32,bottom:32,display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:3}},
+            ...[1,1,1,0,1,1,1,1,0,1,0,1,0,1,1,1,1,0,1,1,1,0,0,0,1,0,0,0,1,1,1,0,1,0,1,0,1,0,1,0,1,0,1,1,1,0,1,1,1].map(function(v,i){
+              return e("div",{key:i,style:{background:v?"#e2e8f0":"#334155",borderRadius:2,aspectRatio:"1",opacity:.7}})
+            })
+          )
+        )
+      ),
+      // URL prompt card (slides up after 2s)
+      e(QRPrompt,{onOpen:function(){setScreen("landing")}})
+    );
+  }
+
+  /* ─── LANDING ─── */
+  if(screen==="landing"){
+    return e(Shell,null,
+      e("div",{style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"32px 28px",background:"#fff",animation:"slideIn .5s ease"}},
+        e("div",{style:{width:80,height:80,borderRadius:"50%",background:`linear-gradient(135deg,${TC_RED},#a00028)`,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 8px 24px rgba(204,0,51,.25)",marginBottom:20}},
+          e("span",{style:{color:"#fff",fontWeight:800,fontSize:26}},"TC")
+        ),
+        e("h1",{style:{fontSize:20,fontWeight:800,color:"#1a1a2e",margin:"0 0 4px",textAlign:"center"}},"Texas Children\u2019s Hospital"),
+        e("p",{style:{fontSize:14,fontWeight:600,color:TC_BLUE,margin:"0 0 8px"}},"Emergency Department"),
+        e("div",{style:{width:40,height:3,background:TC_RED,borderRadius:2,marginBottom:20}}),
+        e("h2",{style:{fontSize:17,fontWeight:700,color:"#1a1a2e",margin:"0 0 10px",textAlign:"center"}},"Health & Wellness Survey"),
+        e("p",{style:{fontSize:14,color:"#667085",textAlign:"center",lineHeight:1.6,margin:"0 0 32px",maxWidth:300}},"This short, private survey helps your care team understand your health needs better. Your answers are confidential and protected."),
+        e("button",{onClick:()=>setScreen("language"),style:{width:"100%",maxWidth:320,padding:"15px 0",borderRadius:26,border:"none",background:`linear-gradient(135deg,${TC_BLUE},#004d86)`,color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 14px rgba(0,102,179,.3)"}},"Begin Survey"),
+        e("p",{style:{fontSize:11,color:"#98a2b3",marginTop:18,textAlign:"center"}},"\ud83d\udd12 HIPAA Compliant \u00b7 Encrypted \u00b7 No data stored on your device")
+      )
+    );
+  }
+
+  /* ─── LANGUAGE ─── */
+  if(screen==="language"){
+    return e(Shell,{showBar:true},
+      e("div",{style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"32px 24px",background:"#fff",animation:"slideIn .4s ease"}},
+        e("div",{style:{fontSize:36,marginBottom:16}},"\ud83c\udf10"),
+        e("h2",{style:{fontSize:20,fontWeight:800,color:"#1a1a2e",margin:"0 0 4px"}},"Choose Your Language"),
+        e("p",{style:{fontSize:13,color:"#667085",margin:"0 0 32px"}},"Elige tu idioma"),
+        e("button",{onClick:()=>setScreen("consent"),style:{width:"100%",maxWidth:320,padding:"18px 20px",borderRadius:14,border:`2px solid ${TC_BLUE}`,background:"#f0f6ff",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",marginBottom:14}},
+          e("div",{style:{textAlign:"left"}},
+            e("div",{style:{fontSize:16,fontWeight:700,color:TC_BLUE}},"English"),
+            e("div",{style:{fontSize:12,color:"#667085"}},"Continue in English")
+          ),
+          e("div",{style:{width:24,height:24,borderRadius:"50%",background:TC_BLUE,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:14,fontWeight:700}},"\u2713")
+        ),
+        e("button",{onClick:()=>setScreen("consent"),style:{width:"100%",maxWidth:320,padding:"18px 20px",borderRadius:14,border:"1.5px solid #e5e7eb",background:"#fff",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"}},
+          e("div",{style:{textAlign:"left"}},
+            e("div",{style:{fontSize:16,fontWeight:700,color:"#344054"}},"Espa\u00f1ol"),
+            e("div",{style:{fontSize:12,color:"#667085"}},"Continuar en espa\u00f1ol")
+          ),
+          e("div",{style:{width:24,height:24,borderRadius:"50%",border:"1.5px solid #d0d5dd"}})
+        )
+      )
+    );
+  }
+
+  /* ─── CONSENT ─── */
+  if(screen==="consent"){
+    return e(Shell,{showBar:true},
+      e("div",{style:{padding:"16px 20px",borderBottom:"1px solid #e5e7eb",background:"#fff",flexShrink:0}},
+        e("h2",{style:{fontSize:18,fontWeight:800,color:"#1a1a2e",margin:0}},"Before We Start"),
+        e("p",{style:{fontSize:12,color:"#667085",margin:"2px 0 0"}},"Please review the following information")
+      ),
+      e("div",{style:{flex:1,overflow:"auto",padding:"16px 20px",background:"#fff",WebkitOverflowScrolling:"touch"}},
+        e("div",{style:{background:"#fffbf0",border:"1px solid #fde68a",borderRadius:12,padding:"14px 16px",marginBottom:18}},
+          e("p",{style:{fontSize:13,lineHeight:1.6,color:"#92400e",margin:0}},
+            e("strong",null,"\ud83d\udd12 Your Privacy Is Protected"),e("br"),
+            "Your answers are confidential. No information is stored on your phone. Your parent/guardian will not see your responses."
+          )
+        ),
+        e("h3",{style:{fontSize:15,fontWeight:700,color:"#1a1a2e",margin:"0 0 8px"}},"About This Survey"),
+        e("p",{style:{fontSize:13,color:"#344054",lineHeight:1.7,margin:"0 0 16px"}},"This survey is part of a health research study. It asks questions about your health, including some personal topics. This helps us offer you the best care and connect you with services if needed."),
+        e("h3",{style:{fontSize:15,fontWeight:700,color:"#1a1a2e",margin:"0 0 8px"}},"What to Know"),
+        e("div",{style:{fontSize:13,color:"#344054",lineHeight:1.8,marginBottom:20}},
+          e("div",null,"\u2022 This is ",e("strong",null,"voluntary")," \u2014 you can stop at any time"),
+          e("div",null,"\u2022 Your answers are ",e("strong",null,"encrypted")," and sent securely"),
+          e("div",null,"\u2022 Your care will ",e("strong",null,"not change")," if you choose not to participate"),
+          e("div",null,"\u2022 Takes approximately ",e("strong",null,"3\u20135 minutes"))
+        ),
+        e(ConsentCB,{onAgree:startChat})
+      )
+    );
+  }
+
+  /* ─── MHEALTH ─── */
+  if(screen==="mhealth"){
+    return e(Shell,null,
+      e("div",{style:{flex:1,display:"flex",flexDirection:"column",justifyContent:"center",padding:"24px 20px",background:"#fff",animation:"slideIn .4s ease"}},
+        e("div",{style:{border:"1px solid #e5e7eb",borderRadius:16,padding:20,boxShadow:"0 4px 16px rgba(0,0,0,.06)"}},
+          e("div",{style:{display:"flex",alignItems:"center",gap:12,marginBottom:14}},
+            e("div",{style:{width:44,height:44,borderRadius:12,background:`linear-gradient(135deg,${TC_BLUE},#004d86)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}},"\ud83d\udcac"),
+            e("div",null,
+              e("div",{style:{fontSize:16,fontWeight:700,color:"#1a1a2e"}},"SMART Health Texts"),
+              e("div",{style:{fontSize:12,color:"#667085"}},"Free \u00b7 Confidential \u00b7 Text-based")
+            )
+          ),
+          e("p",{style:{fontSize:14,color:"#344054",lineHeight:1.6,margin:"0 0 8px"}},"Based on your responses, there\u2019s a free program that could be helpful for you."),
+          e("p",{style:{fontSize:13,color:"#667085",lineHeight:1.6,margin:"0 0 20px"}},"Get private health info, appointment help, and support sent right to your phone. You can opt out at any time."),
+          e("div",{style:{display:"flex",gap:10}},
+            e("button",{onClick:()=>setScreen("done"),style:{flex:1,padding:"14px 0",borderRadius:24,border:"none",background:SUCCESS,color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer"}},"Sign Me Up"),
+            e("button",{onClick:()=>setScreen("done"),style:{flex:1,padding:"14px 0",borderRadius:24,border:"1.5px solid #d0d5dd",background:"#fff",color:"#667085",fontSize:15,fontWeight:600,cursor:"pointer"}},"No Thanks")
+          )
+        ),
+        e("p",{style:{fontSize:12,color:"#98a2b3",textAlign:"center",marginTop:16,lineHeight:1.5}},"This is completely optional. Your care today won\u2019t be affected either way.")
+      )
+    );
+  }
+
+  /* ─── DONE ─── */
+  if(screen==="done"){
+    return e(Shell,null,
+      e("div",{style:{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"32px 28px",background:"#fff",textAlign:"center",animation:"slideIn .4s ease"}},
+        e("div",{style:{width:72,height:72,borderRadius:"50%",background:"#f0fdf4",border:`3px solid ${SUCCESS}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,marginBottom:20}},"\u2713"),
+        e("h2",{style:{fontSize:22,fontWeight:800,color:"#1a1a2e",margin:"0 0 8px"}},"All Done!"),
+        e("p",{style:{fontSize:14,color:"#667085",lineHeight:1.6,margin:"0 0 24px",maxWidth:280}},"You can close this page now. Your care team has received your responses and may follow up with you."),
+        e("div",{style:{background:"#f9fafb",borderRadius:12,padding:"16px 20px",width:"100%",maxWidth:300}},
+          e("p",{style:{fontSize:12,color:"#98a2b3",margin:0,lineHeight:1.6}},"\ud83d\udd12 No data has been saved on this device. Your responses were encrypted and transmitted securely.")
+        ),
+        e("button",{onClick:()=>{setScreen("qrscan");setChatLog([]);setStep(0);setAnswers({});setProg(0)},style:{marginTop:28,padding:"10px 28px",borderRadius:20,border:"1.5px solid #d0d5dd",background:"#fff",fontSize:13,fontWeight:600,color:"#667085",cursor:"pointer"}},"Restart Demo")
+      )
+    );
+  }
+
+  /* ─── CHAT ─── */
+  return e(Shell,null,
+    e("div",{style:{background:"#fff",borderBottom:"1px solid #e5e7eb",padding:"10px 16px",display:"flex",alignItems:"center",gap:12,flexShrink:0}},
+      e("div",{style:avatarS},"TC"),
+      e("div",{style:{flex:1}},
+        e("div",{style:{fontSize:15,fontWeight:700,color:"#1a1a2e"}},"Health Survey"),
+        e("div",{style:{fontSize:11,color:"#667085"}},"\ud83d\udd12 Secure \u00b7 Confidential")
+      ),
+      e("div",{style:{fontSize:12,fontWeight:600,color:TC_BLUE}},progress+"%")
+    ),
+    e("div",{style:{height:3,background:"#e5e7eb",flexShrink:0}},
+      e("div",{style:{height:"100%",background:TC_BLUE,borderRadius:"0 2px 2px 0",width:progress+"%",transition:"width .6s ease"}})
+    ),
+    e("div",{ref:scrollRef,style:{flex:1,overflow:"auto",padding:"14px 14px 8px",background:CHAT_BG,display:"flex",flexDirection:"column",gap:10,WebkitOverflowScrolling:"touch"}},
+      ...chatLog.map((m,i)=>e("div",{key:i,style:{animation:"fadeUp .25s ease"}},
+        m.type==="bot"?e(BotBubble,{text:m.text,isPrivacy:m.isPrivacy}):e(UserBubble,{text:m.text})
+      )),
+      typing?e(TypingDots,{key:"typing"}):null,
+      awaiting&&opts.length>0?e("div",{key:"opts",style:{display:"flex",flexWrap:"wrap",gap:8,padding:"4px 0 8px 40px",animation:"fadeUp .3s ease"}},
+        ...opts.map((o,i)=>e(OptionBtn,{key:i,text:o,onClick:handleAns}))
+      ):null,
+      e("div",{style:{height:8}})
+    ),
+    e("div",{style:{background:"#fff",borderTop:"1px solid #e5e7eb",padding:"10px 16px 16px",flexShrink:0}},
+      e("div",{style:{padding:"12px 18px",borderRadius:24,background:"#f3f4f6",fontSize:14,color:"#98a2b3"}},
+        awaiting?"Tap an option above...":"Waiting..."
+      )
+    )
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(e(App));
+</script>
+</body>
+</html>

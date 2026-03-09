@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ATN 164 — QR Sign Generator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f1f5f9;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:40px 20px}
+  
+  /* ── SETUP PANEL ── */
+  .setup{background:#fff;border-radius:16px;padding:32px;max-width:500px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,.08);margin-bottom:32px}
+  .setup h1{font-size:20px;font-weight:800;color:#1e293b;margin-bottom:4px}
+  .setup p{font-size:13px;color:#64748b;margin-bottom:20px;line-height:1.6}
+  .setup label{display:block;font-size:13px;font-weight:600;color:#334155;margin-bottom:6px}
+  .setup input{width:100%;padding:12px 16px;border-radius:10px;border:1.5px solid #d0d5dd;font-size:14px;outline:none;transition:border .2s}
+  .setup input:focus{border-color:#0066B3}
+  .setup .hint{font-size:11px;color:#94a3b8;margin-top:6px;line-height:1.5}
+  .btn{display:inline-block;padding:12px 28px;border-radius:10px;border:none;background:linear-gradient(135deg,#0066B3,#004d86);color:#fff;font-size:14px;font-weight:700;cursor:pointer;margin-top:16px;transition:transform .1s}
+  .btn:active{transform:scale(.97)}
+  .btn-outline{background:#fff;border:1.5px solid #d0d5dd;color:#64748b;margin-left:8px}
+  .btn-outline:hover{background:#f9fafb}
+  
+  /* ── PRINTABLE SIGN ── */
+  .sign-wrap{max-width:700px;width:100%}
+  .sign{background:#fff;border-radius:4px;padding:60px 48px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.06);position:relative;overflow:hidden}
+  
+  /* Red top bar */
+  .sign::before{content:'';position:absolute;top:0;left:0;right:0;height:8px;background:#CC0033}
+  
+  .sign .logo-area{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:28px}
+  .sign .logo-circle{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#CC0033,#a00028);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:20px}
+  .sign .logo-text h2{font-size:22px;font-weight:800;color:#1a1a2e;text-align:left}
+  .sign .logo-text p{font-size:13px;color:#0066B3;font-weight:600;text-align:left}
+  
+  .sign .divider{width:60px;height:3px;background:#CC0033;border-radius:2px;margin:0 auto 24px}
+  
+  .sign .headline{font-size:26px;font-weight:800;color:#1a1a2e;margin-bottom:8px;line-height:1.3}
+  .sign .subhead{font-size:15px;color:#475569;margin-bottom:32px;line-height:1.5;max-width:480px;margin-left:auto;margin-right:auto}
+  
+  .sign .qr-container{display:inline-block;padding:20px;background:#fff;border-radius:16px;border:2px solid #e2e8f0;margin-bottom:24px;position:relative}
+  .sign .qr-container::after{content:'';position:absolute;inset:6px;border-radius:12px;border:2px dashed #cbd5e1;pointer-events:none}
+  
+  .sign .instruction{display:flex;align-items:center;justify-content:center;gap:10px;background:#f0f6ff;border-radius:12px;padding:14px 24px;margin-bottom:20px;max-width:400px;margin-left:auto;margin-right:auto}
+  .sign .instruction .icon{width:36px;height:36px;border-radius:50%;background:#0066B3;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;flex-shrink:0}
+  .sign .instruction span{font-size:15px;font-weight:600;color:#0066B3;text-align:left}
+  
+  .sign .features{display:flex;justify-content:center;gap:28px;margin-bottom:20px;flex-wrap:wrap}
+  .sign .features .feat{display:flex;align-items:center;gap:6px;font-size:12px;color:#64748b}
+  .sign .features .feat .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  
+  .sign .footer-note{font-size:11px;color:#94a3b8;line-height:1.5;max-width:420px;margin:0 auto}
+  
+  .sign .lang-note{display:inline-block;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:8px 16px;font-size:12px;color:#166534;font-weight:500;margin-bottom:20px}
+  
+  /* Print styles */
+  @media print{
+    body{background:#fff;padding:0}
+    .setup,.print-controls,.no-print{display:none!important}
+    .sign-wrap{max-width:100%}
+    .sign{box-shadow:none;padding:48px 40px;border:1px solid #e2e8f0}
+  }
+</style>
+</head>
+<body>
+
+<!-- SETUP PANEL -->
+<div class="setup" id="setupPanel">
+  <h1>ATN 164 — QR Sign Generator</h1>
+  <p>Enter the URL where you're hosting the chatbot, and this tool will generate a branded, printable triage room sign with a real, scannable QR code.</p>
+  
+  <label for="urlInput">Chatbot URL</label>
+  <input type="url" id="urlInput" placeholder="https://your-demo-site.netlify.app" value=""/>
+  <div class="hint">
+    This is the URL where you uploaded ATN164_Chatbot_Demo.html.<br/>
+    Examples: https://your-site.netlify.app &nbsp;·&nbsp; https://yourorg.sharepoint.com/sites/demo/chatbot.html
+  </div>
+  
+  <button class="btn" onclick="generateSign()">Generate Sign</button>
+</div>
+
+<!-- PRINTABLE SIGN -->
+<div class="sign-wrap" id="signWrap" style="display:none">
+  
+  <div class="print-controls" style="display:flex;gap:8px;margin-bottom:16px;justify-content:center;flex-wrap:wrap">
+    <button class="btn" onclick="window.print()" style="margin:0">🖨️ Print Sign</button>
+    <button class="btn btn-outline" onclick="document.getElementById('setupPanel').style.display='block';document.getElementById('signWrap').style.display='none'" style="margin:0">← Change URL</button>
+  </div>
+  
+  <div class="sign" id="printableSign">
+    <div class="logo-area">
+      <div class="logo-circle">TC</div>
+      <div class="logo-text">
+        <h2>Texas Children's Hospital</h2>
+        <p>Emergency Department</p>
+      </div>
+    </div>
+    
+    <div class="divider"></div>
+    
+    <div class="headline">Free & Confidential<br/>Health Survey</div>
+    <div class="subhead">Help us provide you with the best care. This short survey asks about your health and connects you with services you may need.</div>
+    
+    <div class="qr-container">
+      <div id="qrCode"></div>
+    </div>
+    
+    <div class="instruction">
+      <div class="icon">📱</div>
+      <span>Open your phone camera and point it at the code above</span>
+    </div>
+    
+    <div class="lang-note">🌐 Available in English and Spanish / Disponible en inglés y español</div>
+    
+    <div class="features">
+      <div class="feat"><div class="dot" style="background:#2D8B4E"></div>Private & Confidential</div>
+      <div class="feat"><div class="dot" style="background:#0066B3"></div>Takes 3–5 Minutes</div>
+      <div class="feat"><div class="dot" style="background:#CC0033"></div>Voluntary</div>
+    </div>
+    
+    <div class="footer-note">
+      🔒 Your answers are encrypted and will not be seen by anyone in the waiting room or your family. No data is stored on your phone. Your care will not change if you choose not to participate.
+    </div>
+  </div>
+</div>
+
+<script>
+function generateSign() {
+  var url = document.getElementById('urlInput').value.trim();
+  if (!url) { alert('Please enter a URL.'); return; }
+  if (!url.startsWith('http')) url = 'https://' + url;
+  
+  // Clear previous QR
+  var qrEl = document.getElementById('qrCode');
+  qrEl.innerHTML = '';
+  
+  // Generate QR code
+  new QRCode(qrEl, {
+    text: url,
+    width: 200,
+    height: 200,
+    colorDark: "#1a1a2e",
+    colorLight: "#ffffff",
+    correctLevel: QRCode.CorrectLevel.M
+  });
+  
+  // Show sign, hide setup
+  document.getElementById('setupPanel').style.display = 'none';
+  document.getElementById('signWrap').style.display = 'block';
+}
+
+// Allow Enter key
+document.getElementById('urlInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') generateSign();
+});
+</script>
+</body>
+</html>
