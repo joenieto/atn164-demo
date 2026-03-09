@@ -22,11 +22,9 @@ Contamination. The devices not need to be wiped down before beinging handled by 
 
 ## Live Demo
 
-**Chatbot:** [https://yourusername.github.io/atn164-demo/](https://yourusername.github.io/atn164-demo/)
+**Chatbot:** [https://joenieto.github.io/atn164-demo/](https://yourusername.github.io/atn164-demo/)
 
-**QR Sign Generator:** [https://yourusername.github.io/atn164-demo/ATN164_QR_Sign_Generator.html](https://yourusername.github.io/atn164-demo/ATN164_QR_Sign_Generator.html)
-
-> Replace `yourusername` with your actual GitHub username after deploying.
+**QR Sign Generator:** [https://joenieto.github.io/atn164-demo/ATN164_QR_Sign_Generator.html](https://joenieto.github.io/atn164-demo/ATN164_QR_Sign_Generator.html)
 
 ## How to Demo
 
